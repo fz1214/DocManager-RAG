@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Tableau de bord</h1>
+    <p class="page-subtitle">Bienvenue dans votre espace de gestion de documents</p>
+  </div>
+</div>
+
+<div class="dashboard-stats">
+  <div class="stat-card">
+    <div class="stat-icon">
+      <i class="fas fa-file-alt"></i>
+    </div>
+    <div class="stat-number">{{ total_docs }}</div>
+    <div class="stat-label">Documents</div>
+  </div>
+  
+  <div class="stat-card">
+    <div class="stat-icon">
+      <i class="fas fa-robot"></i>
+    </div>
+    <div class="stat-number">{{ total_questions }}</div>
+    <div class="stat-label">Questions posées</div>
+  </div>
+  
+  <div class="stat-card">
+    <div class="stat-icon">
+      <i class="fas fa-hdd"></i>
+    </div>
+    <div class="stat-number">{{ "%.1f"|format(used_space_kb / 1024) if used_space_kb > 0 else "0.0" }}</div>
+    <div class="stat-label">Espace utilisé (MB)</div>
+  </div>
+</div>
+
+<div class="dashboard-content">
+  <div class="dashboard-grid">
+    <div class="recent-section">
+      <div class="recent-header">
+        <i class="fas fa-clock"></i>
+        <h2>Documents récents</h2>
+      </div>
+      
+      {% if recent_docs %}
+      <div class="recent-list">
+        {% for doc in recent_docs %}
+        <div class="recent-item">
+          <div class="recent-icon">
+            <i class="fas fa-file-pdf"></i>
+          </div>
+          <div class="recent-content">
+            <div class="recent-name">{{ doc['FileName'] }}</div>
+            <div class="recent-date">{{ doc.get('UploadDate', '')[:10] if doc.get('UploadDate') else '' }}</div>
+          </div>
+          <div class="recent-status">
+            <span class="status-badge status-{{ doc.get('Status', 'unknown').lower() }}">
+              {{ doc.get('Status', 'Inconnu') }}
+            </span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <i class="fas fa-file-alt empty-icon"></i>
+        <h3>Aucun document</h3>
+        <p>Commencez par télécharger votre premier document</p>
+        <a href="{{ url_for('main.documents') }}" class="btn btn-primary">
+          <i class="fas fa-upload"></i>
+          Télécharger un document
+        </a>
+      </div>
+      {% endif %}
+    </div>
+    
+    <div class="recent-section">
+      <div class="recent-header">
+        <i class="fas fa-history"></i>
+        <h2>Questions récentes</h2>
+      </div>
+      
+      {% if recent_questions %}
+      <div class="recent-list">
+        {% for q in recent_questions %}
+        <div class="recent-item">
+          <div class="recent-icon">
+            <i class="fas fa-question-circle"></i>
+          </div>
+          <div class="recent-content">
+            <div class="recent-name">{{ q['FileName'] }}</div>
+            <div class="recent-question">{{ q['Question'][:50] }}{% if q['Question']|length > 50 %}...{% endif %}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <i class="fas fa-comments empty-icon"></i>
+        <h3>Aucune question</h3>
+        <p>Posez votre première question sur vos documents</p>
+        <a href="{{ url_for('main.rag') }}" class="btn btn-primary">
+          <i class="fas fa-robot"></i>
+          Poser une question
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<style>
+.stat-icon {
+  width: 64px;
+  height: 64px;
+  background: var(--primary);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.5rem;
+  color: white;
+  font-size: 2rem;
+  transition: var(--transition);
+}
+
+.stat-card:hover .stat-icon {
+  transform: scale(1.1);
+  background: var(--primary-dark);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  color: var(--text-light);
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1.5rem;
+  opacity: 0.5;
+  color: var(--primary);
+}
+
+.empty-state h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--text);
+}
+
+.empty-state p {
+  margin-bottom: 2rem;
+  font-size: 1.1rem;
+}
+
+.recent-status {
+  flex-shrink: 0;
+}
+
+.recent-question {
+  font-size: 0.9rem;
+  color: var(--text-light);
+  line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .stat-icon {
+    width: 56px;
+    height: 56px;
+    font-size: 1.75rem;
+  }
+  
+  .empty-icon {
+    font-size: 3rem;
+  }
+}
+</style>
+{% endblock %}
+
+

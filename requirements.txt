@@ -1,0 +1,15 @@
+Flask==3.0.3
+Flask-Session==0.8.0
+Flask-Login==0.6.3
+azure-data-tables==12.5.0
+azure-storage-blob==12.20.0
+azure-core==1.30.2
+PyPDF2==3.0.1
+
+langchain==0.2.14
+langchain-community==0.2.12
+langchain-openai==0.1.21
+azure-search-documents==11.6.0b9
+azure-identity==1.16.0
+python-dotenv==1.0.1
+

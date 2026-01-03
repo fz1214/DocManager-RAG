@@ -1,0 +1,381 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Assistant IA</h1>
+    <p class="page-subtitle">Posez des questions sur vos documents et obtenez des réponses intelligentes</p>
+  </div>
+</div>
+
+<div class="rag-container">
+  <div class="rag-section">
+    <div class="section-card">
+      <div class="card-header">
+        <i class="fas fa-question-circle"></i>
+        <h2>Poser une question</h2>
+      </div>
+      
+      <form id="rag-form" class="rag-form" method="post">
+        <div class="form-group">
+          <label for="document" class="form-label">
+            <i class="fas fa-file-alt"></i>
+            Sélectionner un document
+          </label>
+          <select name="document" id="document" class="form-select" required>
+            <option value="">Choisir un document...</option>
+            {% for doc in docs %}
+            <option value="{{ doc['FileName'] }}" {% if chosen_doc and chosen_doc['FileName'] == doc['FileName'] %}selected{% endif %}>
+              {{ doc['FileName'] }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="question" class="form-label">
+            <i class="fas fa-comment"></i>
+            Votre question
+          </label>
+          <textarea 
+            name="question" 
+            id="question" 
+            class="form-textarea" 
+            placeholder="Que souhaitez-vous savoir sur ce document ?"
+            rows="4"
+            required
+          >{{ request.form.get('question', '') }}</textarea>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-full" id="submit-btn">
+          <i class="fas fa-paper-plane"></i>
+          <span id="submit-text">Envoyer la question</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Zone de réponse avec streaming -->
+  <div class="rag-section" id="answer-section" {% if not answer %}style="display: none;"{% endif %}>
+    <div class="section-card answer-card">
+      <div class="card-header">
+        <i class="fas fa-lightbulb"></i>
+        <h2>Réponse de l'Assistant IA</h2>
+        <span class="document-source" id="document-source">Document: {% if chosen_doc %}{{ chosen_doc['FileName'] }}{% endif %}</span>
+        <div class="streaming-indicator" id="streaming-indicator" style="display: none;">
+          <i class="fas fa-spinner fa-spin"></i>
+          <span>Génération en cours...</span>
+        </div>
+      </div>
+      
+      <div class="answer-content">
+        <div class="answer-text" id="answer-text">
+          {% if answer %}{{ answer }}{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if history %}
+  <div class="rag-section">
+    <div class="section-card">
+      <div class="card-header">
+        <i class="fas fa-history"></i>
+        <h2>Historique des questions ({{ history|length }})</h2>
+        <form method="post" action="{{ url_for('main.clear_history') }}" style="margin-left:auto">
+          <button type="submit" class="btn btn-danger">
+            <i class="fas fa-trash"></i>
+            Vider l'historique
+          </button>
+        </form>
+      </div>
+      
+      <div class="history-list">
+        {% for q in history %}
+        <div class="history-item">
+          <div class="history-header">
+            <div class="history-doc">
+              <i class="fas fa-file-alt"></i>
+              <span>{{ q['FileName'] }}</span>
+            </div>
+            <div class="history-date">
+              {% set date_str = q['AskedAt'] or q.get('Timestamp', '') %}
+              {% if date_str %}
+                {{ date_str[:10] }} à {{ date_str[11:16] if date_str|length > 16 else '' }}
+              {% endif %}
+            </div>
+            <form method="post" action="{{ url_for('main.delete_question_route') }}" style="margin-left:auto">
+              <input type="hidden" name="question_id" value="{{ q['RowKey'] }}" />
+              <input type="hidden" name="partition_key" value="{{ q['PartitionKey'] }}" />
+              <button type="submit" class="btn btn-danger btn-small" title="Supprimer cette question">
+                <i class="fas fa-trash"></i>
+              </button>
+            </form>
+          </div>
+          
+          <div class="history-question">
+            <strong>Question:</strong>
+            <span>{{ q['Question'] }}</span>
+          </div>
+          
+          {% if q.get('Answer') %}
+          <div class="history-answer">
+            <strong>Réponse:</strong>
+            <span>{{ q['Answer'] }}</span>
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+// Variables globales
+let eventSource = null;
+let isStreaming = false;
+
+// Amélioration de l'expérience utilisateur
+document.getElementById('question').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = (this.scrollHeight) + 'px';
+});
+
+// Focus automatique sur la question si un document est sélectionné
+document.getElementById('document').addEventListener('change', function() {
+  if (this.value) {
+    document.getElementById('question').focus();
+  }
+});
+
+// Gestion du formulaire - mode classique pour l'instant
+document.getElementById('rag-form').addEventListener('submit', function(e) {
+  const selectedDocument = document.getElementById('document').value;
+  const question = document.getElementById('question').value.trim();
+  
+  console.log('Formulaire soumis - mode classique');
+  console.log('Document sélectionné:', selectedDocument);
+  console.log('Question:', question);
+  
+  if (!selectedDocument || !question) {
+    e.preventDefault();
+    alert('Veuillez sélectionner un document et poser une question.');
+    return;
+  }
+  
+  // Laisser le formulaire se soumettre normalement
+  console.log('Soumission du formulaire...');
+});
+
+function startStreaming(selectedDocument, question) {
+  // Masquer l'ancienne réponse
+  document.getElementById('answer-section').style.display = 'none';
+  
+  // Afficher la zone de réponse
+  const answerSection = document.getElementById('answer-section');
+  const documentSource = document.getElementById('document-source');
+  const streamingIndicator = document.getElementById('streaming-indicator');
+  const answerText = document.getElementById('answer-text');
+  const submitBtn = document.getElementById('submit-btn');
+  const submitText = document.getElementById('submit-text');
+  
+  answerSection.style.display = 'block';
+  documentSource.textContent = `Document: ${selectedDocument}`;
+  streamingIndicator.style.display = 'flex';
+  answerText.textContent = '';
+  
+  // Désactiver le bouton
+  submitBtn.disabled = true;
+  submitText.textContent = 'Génération...';
+  
+  isStreaming = true;
+  
+  // Fermer la connexion précédente si elle existe
+  if (eventSource) {
+    eventSource.close();
+  }
+  
+  // Pour l'instant, utiliser directement la méthode classique
+  // TODO: Réactiver le streaming une fois corrigé
+  fallbackToClassicMethod(selectedDocument, question);
+  
+  // Code de streaming désactivé temporairement
+  /*
+  fetch('/rag_stream', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      document: selectedDocument,
+      question: question
+    })
+  })
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    // Vérifier si c'est du streaming (text/event-stream) ou du JSON normal
+    const contentType = response.headers.get('content-type');
+    
+    if (contentType && contentType.includes('text/event-stream')) {
+      // Mode streaming
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      
+      function readStream() {
+        return reader.read().then(({ done, value }) => {
+          if (done) {
+            stopStreaming();
+            return;
+          }
+          
+          // Décoder le chunk
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                
+                switch(data.type) {
+                  case 'start':
+                    console.log('Début du streaming:', data.message);
+                    break;
+                    
+                  case 'chunk':
+                    // Ajouter le chunk à la réponse
+                    answerText.textContent += data.content;
+                    // Faire défiler vers le bas
+                    answerText.scrollTop = answerText.scrollHeight;
+                    break;
+                    
+                  case 'end':
+                    console.log('Fin du streaming:', data.message);
+                    stopStreaming();
+                    return;
+                    
+                  case 'error':
+                    console.error('Erreur de streaming:', data.message);
+                    answerText.textContent = `Erreur: ${data.message}`;
+                    stopStreaming();
+                    return;
+                }
+              } catch (e) {
+                console.error('Erreur de parsing JSON:', e);
+              }
+            }
+          }
+          
+          // Continuer à lire
+          return readStream();
+        });
+      }
+      
+      return readStream();
+    } else {
+      // Mode classique (fallback)
+      return response.json().then(data => {
+        if (data.error) {
+          answerText.textContent = `Erreur: ${data.error}`;
+        } else {
+          answerText.textContent = data.answer || 'Aucune réponse reçue.';
+        }
+        stopStreaming();
+      });
+    }
+  })
+  .catch(error => {
+    console.error('Erreur de connexion:', error);
+    // Fallback vers la méthode classique
+    fallbackToClassicMethod(selectedDocument, question);
+  });
+  */
+}
+
+function fallbackToClassicMethod(selectedDocument, question) {
+  // Fallback vers la méthode classique si le streaming échoue
+  const answerText = document.getElementById('answer-text');
+  const streamingIndicator = document.getElementById('streaming-indicator');
+  
+  console.log('Utilisation de la méthode classique');
+  
+  // Afficher l'indicateur de chargement
+  streamingIndicator.style.display = 'flex';
+  answerText.textContent = 'Génération de la réponse...';
+  
+  // Créer un formulaire temporaire pour la méthode classique
+  const formData = new FormData();
+  formData.append('document', selectedDocument);
+  formData.append('question', question);
+  
+  fetch('/rag', {
+    method: 'POST',
+    body: formData
+  })
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.text();
+  })
+  .then(html => {
+    console.log('Réponse reçue, parsing...');
+    
+    // Extraire la réponse du HTML retourné
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const answerElement = doc.querySelector('#answer-text');
+    
+    if (answerElement && answerElement.textContent.trim()) {
+      answerText.textContent = answerElement.textContent.trim();
+      console.log('Réponse affichée:', answerElement.textContent.trim());
+    } else {
+      // Essayer de trouver la réponse dans d'autres éléments
+      const answerSection = doc.querySelector('.answer-text');
+      if (answerSection && answerSection.textContent.trim()) {
+        answerText.textContent = answerSection.textContent.trim();
+      } else {
+        answerText.textContent = 'Aucune réponse reçue. Veuillez réessayer.';
+      }
+    }
+    stopStreaming();
+  })
+  .catch(error => {
+    console.error('Erreur avec la méthode classique:', error);
+    answerText.textContent = `Erreur: Impossible de traiter la question. ${error.message}`;
+    stopStreaming();
+  });
+}
+
+function stopStreaming() {
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
+  }
+  
+  isStreaming = false;
+  
+  // Réactiver le bouton
+  const submitBtn = document.getElementById('submit-btn');
+  const submitText = document.getElementById('submit-text');
+  const streamingIndicator = document.getElementById('streaming-indicator');
+  
+  submitBtn.disabled = false;
+  submitText.textContent = 'Envoyer la question';
+  streamingIndicator.style.display = 'none';
+}
+
+// Nettoyer la connexion quand la page se ferme
+window.addEventListener('beforeunload', function() {
+  if (eventSource) {
+    eventSource.close();
+  }
+});
+</script>
+{% endblock %}
+
+

@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Mes Documents</h1>
+    <p class="page-subtitle">{{ docs|length }} document{{ 's' if docs|length != 1 else '' }} téléchargé{{ 's' if docs|length != 1 else '' }}</p>
+  </div>
+  <div class="upload-section">
+    <form method="post" enctype="multipart/form-data" style="display: inline;">
+      <input type="file" name="file" accept="application/pdf,.pdf" id="file-input" style="display: none;">
+      <button type="button" class="upload-btn" onclick="document.getElementById('file-input').click()">
+        <svg class="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+        </svg>
+        Télécharger des documents
+      </button>
+    </form>
+    
+    <form method="post" action="{{ url_for('main.cleanup_documents') }}" style="display: inline; margin-left: 10px;">
+      <button type="submit" class="btn btn-secondary" onclick="return confirm('Êtes-vous sûr de vouloir nettoyer les documents orphelins ?')">
+        <i class="fas fa-broom"></i>
+        Nettoyer
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+  const fileInput = document.getElementById('file-input');
+  if (fileInput) {
+    fileInput.addEventListener('change', function () {
+      if (this.files && this.files.length > 0) {
+        const f = this.files[0];
+        const isPdf = (f.type === 'application/pdf') || f.name.toLowerCase().endsWith('.pdf');
+        if (isPdf) {
+          // Submit the parent form automatically
+          this.form.submit();
+        } else {
+          alert('Veuillez sélectionner un PDF.');
+          this.value = '';
+        }
+      }
+    });
+  }
+</script>
+
+<div class="docs-grid">
+  {% for d in docs %}
+  <div class="doc-card">
+    <button class="doc-delete" onclick="deleteDocument('{{ d['RowKey'] }}')" title="Supprimer">
+      <svg class="delete-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+      </svg>
+    </button>
+    
+    <div class="doc-header">
+      <div class="doc-icon">
+        <svg fill="currentColor" viewBox="0 0 24 24">
+          <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+        </svg>
+      </div>
+      <div class="doc-info">
+        <h3 class="doc-title">{{ d["FileName"] }}</h3>
+        <div class="doc-meta">
+          <div class="doc-meta-item">
+            <svg class="doc-meta-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
+            </svg>
+            <span>{{ "%.1f"|format(d.get("FileSize", 0) / 1024) }} KB</span>
+          </div>
+          <div class="doc-meta-item">
+            <svg class="doc-meta-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+            </svg>
+            <span>{{ d.get("UploadDate", '')[:10] if d.get("UploadDate") else '' }}</span>
+          </div>
+        </div>
+        <div class="doc-meta">
+          <span class="status-badge status-{{ d.get('Status', 'unknown').lower() }}">
+            {{ d.get("Status", "Inconnu") }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <svg class="empty-state-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+    </svg>
+    <h3>Aucun document téléchargé</h3>
+    <p>Commencez par télécharger votre premier document PDF</p>
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+document.getElementById('file-input').addEventListener('change', function(e) {
+  if (e.target.files.length > 0) {
+    document.getElementById('upload-form').submit();
+  }
+});
+
+function deleteDocument(docId) {
+  if (confirm('Êtes-vous sûr de vouloir supprimer ce document ?')) {
+    // Créer un formulaire pour la suppression
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '{{ url_for("main.delete_document") }}';
+    
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'doc_id';
+    input.value = docId;
+    
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+  }
+}
+</script>
+{% endblock %}
+
+

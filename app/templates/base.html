@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>DocManager</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/modern-normalize/2.0.0/modern-normalize.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="brand">
+        <img src="{{ url_for('static', filename='img/maroc-assistance.png') }}" alt="Maroc Assistance" class="logo">
+      </div>
+      {% if session.get('user_id') %}
+      <nav>
+        <a href="{{ url_for('main.dashboard') }}"><i class="fas fa-home"></i> Tableau de bord</a>
+        <a href="{{ url_for('main.documents') }}"><i class="fas fa-file-alt"></i> Mes Documents</a>
+        <a href="{{ url_for('main.rag') }}"><i class="fas fa-robot"></i> Assistant IA</a>
+      </nav>
+      <div class="user-area">
+        <span>{{ session.get('email') }}</span>
+      </div>
+      {% endif %}
+      <div class="app-brand">
+        <i class="fas fa-search app-logo-icon"></i>
+        <div class="app-title-stack">
+          <span class="app-title">DocManager</span>
+          {% if session.get('user_id') %}
+          <a class="btn btn-link logout-below" href="{{ url_for('main.logout') }}"><i class="fas fa-sign-out-alt"></i> Déconnexion</a>
+          {% endif %}
+        </div>
+      </div>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash">
+      {% for category, msg in messages %}
+        <div class="flash-item {{ category }}">{{ msg }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <main class="container">
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">© 2025 DocManager. Tous droits réservés.</footer>
+  </body>
+  </html>
+
+

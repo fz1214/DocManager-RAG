@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="auth-container">
+  <div class="auth-card">
+    <div class="auth-header">
+      <h1 class="auth-title">DocManager</h1>
+      <p class="auth-subtitle">Gestion intelligente de documents</p>
+    </div>
+    
+    <div class="auth-section">
+      <h2 class="section-title">Inscription</h2>
+      <p class="section-description">Créez votre compte pour commencer</p>
+      
+      <form method="post" class="auth-form">
+        <div class="form-group">
+          <label for="email" class="form-label">
+            <i class="fas fa-envelope"></i>
+            Email
+          </label>
+          <input 
+            type="email" 
+            id="email" 
+            name="email" 
+            class="form-input" 
+            placeholder="votre@email.com"
+            required
+            autocomplete="email"
+          >
+        </div>
+        
+        <div class="form-group">
+          <label for="password" class="form-label">
+            <i class="fas fa-lock"></i>
+            Mot de passe
+          </label>
+          <div class="password-input-group">
+            <input 
+              type="password" 
+              id="password" 
+              name="password" 
+              class="form-input" 
+              placeholder="Créez un mot de passe sécurisé"
+              required
+              autocomplete="new-password"
+            >
+            <button type="button" class="password-toggle" onclick="togglePassword()">
+              <i class="fas fa-eye" id="eye-icon"></i>
+            </button>
+          </div>
+          <div class="password-strength">
+            <div class="strength-bar">
+              <div class="strength-fill" id="strength-fill"></div>
+            </div>
+            <span class="strength-text" id="strength-text">Force du mot de passe</span>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="confirm-password" class="form-label">
+            <i class="fas fa-check-circle"></i>
+            Confirmer le mot de passe
+          </label>
+          <input 
+            type="password" 
+            id="confirm-password" 
+            name="confirm-password" 
+            class="form-input" 
+            placeholder="Répétez votre mot de passe"
+            required
+            autocomplete="new-password"
+          >
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-full">
+          <i class="fas fa-user-plus"></i>
+          Créer mon compte
+        </button>
+      </form>
+      
+      <div class="auth-footer">
+        <p>Déjà inscrit ? 
+          <a href="{{ url_for('main.login') }}" class="auth-link">Se connecter</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function togglePassword() {
+  const passwordInput = document.getElementById('password');
+  const eyeIcon = document.getElementById('eye-icon');
+  
+  if (passwordInput.type === 'password') {
+    passwordInput.type = 'text';
+    eyeIcon.classList.remove('fa-eye');
+    eyeIcon.classList.add('fa-eye-slash');
+  } else {
+    passwordInput.type = 'password';
+    eyeIcon.classList.remove('fa-eye-slash');
+    eyeIcon.classList.add('fa-eye');
+  }
+}
+
+function checkPasswordStrength(password) {
+  let strength = 0;
+  const feedback = [];
+  
+  if (password.length >= 8) strength += 1;
+  if (/[a-z]/.test(password)) strength += 1;
+  if (/[A-Z]/.test(password)) strength += 1;
+  if (/[0-9]/.test(password)) strength += 1;
+  if (/[^A-Za-z0-9]/.test(password)) strength += 1;
+  
+  const strengthFill = document.getElementById('strength-fill');
+  const strengthText = document.getElementById('strength-text');
+  
+  strengthFill.className = 'strength-fill';
+  
+  switch(strength) {
+    case 0:
+    case 1:
+      strengthFill.classList.add('weak');
+      strengthText.textContent = 'Très faible';
+      strengthText.className = 'strength-text weak';
+      break;
+    case 2:
+      strengthFill.classList.add('weak');
+      strengthText.textContent = 'Faible';
+      strengthText.className = 'strength-text weak';
+      break;
+    case 3:
+      strengthFill.classList.add('medium');
+      strengthText.textContent = 'Moyen';
+      strengthText.className = 'strength-text medium';
+      break;
+    case 4:
+      strengthFill.classList.add('strong');
+      strengthText.textContent = 'Fort';
+      strengthText.className = 'strength-text strong';
+      break;
+    case 5:
+      strengthFill.classList.add('very-strong');
+      strengthText.textContent = 'Très fort';
+      strengthText.className = 'strength-text very-strong';
+      break;
+  }
+  
+  strengthFill.style.width = (strength * 20) + '%';
+}
+
+document.getElementById('password').addEventListener('input', function() {
+  checkPasswordStrength(this.value);
+});
+</script>
+{% endblock %}
+
+
