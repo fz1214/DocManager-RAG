@@ -86,7 +86,7 @@ python -m venv .venv
 pip install -r requirements.txt
 
 # Lancer l'application
-python wsgi.py
+python main.py
 ```
 
 ### Configuration
